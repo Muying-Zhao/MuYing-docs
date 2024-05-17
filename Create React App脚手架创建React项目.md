@@ -786,3 +786,327 @@ const nodeRef = useRef(null)
 nodeRef={nodeRef}
 ref={nodeRef}
 ```
+
+# 五、createPortal传送门与逻辑组件的实现
+
+## 1、createPortal传送门
+
+> 在React中，createPortal 是一个高级功能，它允许将子组件渲染到父组件DOM树之外的DOM节点中。这通常用于模态框（Modal）、悬浮卡（Popover）或其他需要脱离当前DOM上下文渲染的UI组件。
+
+* TestDemo.jsx
+
+```js
+import React from 'react'
+import {createPortal} from "react-dom";
+
+function Message() {
+  return createPortal(<div>world hello</div>, document.body)
+}
+
+export default function TestDemo() {
+  return (
+    <>
+      <div>hello world</div>
+      <Message />
+    </>
+  )
+}
+```
+
+## 2、自定义传送门Message组件
+
+* 修改 src/components/`TestDemo.jsx`
+
+```js
+import { useRef, useState } from 'react'
+import ReactDOM from 'react-dom/client';
+import './TestDemo.scss'
+import { CSSTransition } from 'react-transition-group'
+
+const message = {
+  success(text){
+    const message = ReactDOM.createRoot(document.querySelector('#message'))
+    message.render(<Message text={text} icon="✔" />)
+  }
+}
+function Message(props) {
+  const [prop, setProp] = useState(true)
+  const nodeRef = useRef(null)
+  const handleEntered = () => {
+    setTimeout(()=>{
+      setProp(false)
+    }, 2000)
+  }
+  return (
+    <CSSTransition appear nodeRef={nodeRef} in={prop} timeout={1000} classNames="Message" unmountOnExit onEntered={handleEntered}>
+      <div className="Message" ref={nodeRef}>{props.icon} {props.text}</div>
+    </CSSTransition>
+  )
+}
+
+export default function App() {
+  const handleClick = () => {
+    message.success('登录成功');
+  }
+  return (
+    <div>
+      <h2>hello portal</h2>
+      <button onClick={handleClick}>点击</button>
+    </div>
+  )
+}
+```
+
+* 修改 src/components/`TestDemo.scss`
+
+```css
+.Message {
+    display: inline-block;
+    padding: 10px 16px;
+    background: #fff;
+    border-radius: 2px;
+    box-shadow: 0 3px 6px -4px #0000001f, 0 6px 16px #00000014, 0 9px 28px 8px #0000000d;
+    pointer-events: all;
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.Message-enter {
+    opacity: 0;
+    top: 10px;
+}
+
+.Message-enter-active {
+    opacity: 1;
+    top: 20px;
+    transition: 1s;
+}
+
+.Message-enter-done {
+    opacity: 1;
+    top: 20px;
+}
+
+.Message-exit {
+    opacity: 1;
+    top: 20px;
+}
+
+.Message-exit-active {
+    opacity: 0;
+    top: 10px;
+    transition: 1s;
+}
+
+.Message-exit-done {
+    opacity: 0;
+    top: 10px;
+}
+
+.Message-appear {
+    opacity: 0;
+    top: 10px;
+}
+
+.Message-appear-active {
+    opacity: 1;
+    top: 20px;
+    transition: 1s;
+}
+
+.Message-appear-done {
+    opacity: 1;
+    top: 20px;
+}
+```
+
+* App.js使用该组件
+
+```js
+import React from "react";
+import TestDemo from "./components/TestDemo";
+
+function App() {
+  return (
+    <>
+      <TestDemo />
+    </>
+  );
+}
+
+export default App;
+```
+
+# 六、React.lazy与React.Suspense与错误边界
+
+## 1、 React.lazy
+
+> React.lazy 是 React 16.6+ 引入的一个新特性，它允许你动态地导入 React 组件。这对于代码拆分（code splitting）非常有用，特别是在构建大型应用程序时，你可能希望只加载用户当前需要的代码部分，而不是一次性加载整个应用程序的所有代码。简而言之为按需加载。
+
+* 新建`ChildDemo.jsx`组件
+
+```js
+import React from 'react'
+export default function ChildDemo() {
+  return (
+    <div>ChildDemo</div>
+  )
+}
+```
+
+* 修改`TestDemo.jsx`组件
+
+```js
+import React,{lazy} from 'react'
+const ChildDemo=lazy(()=>import('./ChildDemo'))
+export default function TestDemo() {
+  return (
+     <>
+     <div>TestDemo</div>
+     <ChildDemo/>
+     </>
+  )
+}
+```
+
+## 2、React.Suspense
+
+>  用于在组件加载时提供一种优雅的方式来处理加载状态和错误处理。当组件（特别是使用 React.lazy 动态导入的组件）还在加载时，React.Suspense 会显示其 fallback 属性所指定的备用内容，一旦组件加载完成，就会显示实际的组件内容。所以React.lazy与React.Suspense常常一起共同实现懒加载功能和tab切换。
+
+
+* 接着1继续修改`TestDemo.jsx`组件
+
+```js
+import React,{lazy,Suspense} from 'react'
+const ChildDemo=lazy(()=>import('./ChildDemo'))
+export default function TestDemo() {
+  return (
+     <>
+     <div>TestDemo</div>
+     <Suspense fallback={<>loading...</>}>
+     <ChildDemo/>
+     </Suspense>
+     </>
+  )
+}
+```
+
+## 3、React.lazy、React.Suspense与 React.startTransition
+
+> `React.startTransition`用于标记一个UI更新作为"转换"而不是"紧急"更新。它的主要目的是帮助React区分哪些更新是用户直接交互的结果（如点击按钮），哪些更新是间接的或异步的（如数据获取）。所以可以在组件加载完成后（即React.Suspense的fallback消失后）触发一个数据获取操作，并使用React.startTransition来标记这个操作的UI更新。
+
+* 新建`ChildDemo1.jsx`和`ChildDemo2.jsx`组件
+
+> 输入rfc快速创建组件
+
+* 修改`TestDemo.jsx`组件
+
+```js
+import React,{lazy,Suspense,startTransition} from 'react'
+import { useState } from "react";
+const ChildDemo1=lazy(()=>import('./ChildDemo1'))
+const ChildDemo2=lazy(()=>import('./ChildDemo2'))
+export default function TestDemo() {
+  const [show,setShow]=useState(true)
+  const handleClick=()=>{
+    startTransition(()=>{
+      setShow(false)
+    })
+  }
+  return (
+     <>
+     <button onClick={handleClick}>点击切换</button>
+     <Suspense fallback={<>loading...</>}>
+     {show?<ChildDemo1/>:<ChildDemo2/>}
+     </Suspense>
+     </>
+  )
+}
+```
+
+## 3、错误边界来提升用户体验(异常捕获边界)
+
+1. 异常捕获边界
+
+[React错误边界文档](https://zh-hans.legacy.reactjs.org/docs/error-boundaries.html)
+
+> ErrorBoundary是一个 React 错误边界的示例，它是基于类的组件，它依赖于类组件的特定生命周期方法来捕获并处理错误，在 React 应用程序中，错误边界是一个可以捕获并打印发生在其子组件树中任何位置的 JavaScript 错误的组件。它们可以防止整个应用程序崩溃，并允许你展示降级 UI 而不是一个空白页面。
+
+但不是什么情况下都可以使用React的错误边界，它只能捕获子组件树中的错误，而不能捕获事件处理程序、异步代码、服务器端渲染或错误边界自身（而不是其子组件）中抛出的错误。在这些情况下，应该需要使用其他错误处理机制，如try/catch语句或全局错误处理程序。
+
+* 新建`ErrorBoundary.jsx`组件
+
+```js
+import React, { Component } from 'react'
+export default class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false }
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true }
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div>ErrorBoundary</div>
+      )
+    }
+    return this.props.children
+  }
+}
+```
+
+* 修改`TestDemo.jsx`组件
+
+```js
+import React, { lazy, Suspense, startTransition } from 'react'
+import { useState } from "react";
+import ErrorBoundary from "./ErrorBoundary";
+const { ChildDemo1 } = lazy(() => import('./ChildDemo1'))
+const ChildDemo2 = lazy(() => import('./ChildDemo2'))
+export default function TestDemo() {
+  const [show, setShow] = useState(true)
+  const handleClick = () => {
+    startTransition(() => {
+      setShow(false)
+    })
+  }
+  return (
+    <>
+      <button onClick={handleClick}>点击切换</button>
+      <ErrorBoundary>
+        <Suspense fallback={<>loading...</>}>
+          {show ? <ChildDemo1 /> : <ChildDemo2 />}
+        </Suspense>
+      </ErrorBoundary>
+    </>
+  )
+}
+```
+
+2. 静态方法 `getDerivedStateFromError`
+
+> 这是一个特殊的 React 生命周期方法，当在子组件树中抛出错误并被该错误边界捕获时，它会被调用。
+这个方法接收一个 error 参数（即捕获到的错误对象），并返回一个对象来更新组件的 state。
+
+## 4、故障排除
+
+> 不要在其他组件中声明惰性组件,需要始终在模块的顶层声明它们
+
+* 修改`TestDemo.jsx`组件，下方是一个error示例
+
+```js
+import React, { lazy } from 'react'
+export default function TestDemo() {
+  const ChildDemo = lazy(() => import('./ChildDemo.jsx'))
+  return (
+    <>
+      <div>TestDemo</div>
+      <ChildDemo />
+    </>
+  )
+}
+```
