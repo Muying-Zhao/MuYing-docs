@@ -584,6 +584,17 @@ module.exports = {
 
 3. git cz提交信息
 
+```shell
+git add .
+git cz
+git config --global user.name <user.name>
+git config --global user.email <user.email>
+git checkout -b main 
+git branch    
+git remote add origin <存放的git项目url>
+git push -u origin main
+```
+
 ## 4、Git Hooks
 
 1. 什么是Git Hooks
@@ -797,6 +808,3 @@ npx husky add .husky/pre-commit "npx eslint --ext .js,.vue src"
 
 npx lint-staged
 ```
-
-
-
